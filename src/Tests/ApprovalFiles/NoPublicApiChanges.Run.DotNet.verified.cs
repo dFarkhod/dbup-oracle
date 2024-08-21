@@ -46,6 +46,9 @@ namespace DbUp.Oracle
         public static DbUp.Builder.UpgradeEngineBuilder OracleDatabase(this DbUp.Builder.SupportedDatabases supported, string connectionString, string schema, string delimiter) { }
         public static DbUp.Builder.UpgradeEngineBuilder OracleDatabaseWithDefaultDelimiter(this DbUp.Builder.SupportedDatabases supported, string connectionString) { }
         public static DbUp.Builder.UpgradeEngineBuilder OracleDatabaseWithSemicolonDelimiter(this DbUp.Builder.SupportedDatabases supported, string connectionString) { }
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString);
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString, int commandTimeout);
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString, IUpgradeLog logger, int timeout = -1);
     }
     public class OracleObjectParser : DbUp.Support.SqlObjectParser, DbUp.Engine.ISqlObjectParser
     {

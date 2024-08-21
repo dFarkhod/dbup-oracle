@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Data;
 using System.Linq;
 using DbUp.Builder;
+using DbUp.Engine.Output;
 using DbUp.Engine.Transactions;
+using Oracle.ManagedDataAccess.Client;
 
 namespace DbUp.Oracle
 {
@@ -170,6 +173,103 @@ namespace DbUp.Oracle
             builder.WithPreprocessor(new OraclePreprocessor());
             return builder;
         }
-    }
+
 #pragma warning restore IDE0060 // Remove unused parameter
+
+
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString)
+        {
+            OracleDatabase(supported, connectionString, new ConsoleUpgradeLog());
+        }
+
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString, int commandTimeout)
+        {
+            OracleDatabase(supported, connectionString, new ConsoleUpgradeLog(), commandTimeout);
+        }
+
+        public static void OracleDatabase(this SupportedDatabasesForEnsureDatabase supported, string connectionString, IUpgradeLog logger, int timeout = -1)
+        {
+            GetOracleConnectionStringBuilder(connectionString, logger, out var adminConnectionString, out var schemaName);
+
+            try
+            {
+                using (var connection = new OracleConnection(adminConnectionString))
+                {
+                    connection.Open();
+                    if (SchemaExists(connection, schemaName))
+                        return;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.WriteInformation(@"Schema not found on server with connection string in settings: {0}", e.Message);
+            }
+
+            using (var connection = new OracleConnection(adminConnectionString))
+            {
+                connection.Open();
+                if (SchemaExists(connection, schemaName))
+                    return;
+
+                var sqlCommandText = string.Format
+                        (
+                            @"CREATE USER {0} IDENTIFIED BY password DEFAULT TABLESPACE users TEMPORARY TABLESPACE temp;",
+                            schemaName
+                        );
+
+                using (var command = new OracleCommand(sqlCommandText, connection)
+                {
+                    CommandType = CommandType.Text
+                })
+                {
+                    if (timeout >= 0)
+                    {
+                        command.CommandTimeout = timeout;
+                    }
+
+                    command.ExecuteNonQuery();
+                }
+
+                logger.WriteInformation(@"Created schema {0}", schemaName);
+            }
+        }
+
+        static bool SchemaExists(OracleConnection connection, string schemaName)
+        {
+            var sqlCommandText = string.Format
+            (
+                $"SELECT username FROM dba_users WHERE username = '{schemaName.ToUpper()}';"
+            );
+
+            using (var command = new OracleCommand(sqlCommandText, connection)
+            {
+                CommandType = CommandType.Text
+            })
+            {
+                var result = command.ExecuteScalar();
+                return result != null;
+            }
+        }
+
+        static void GetOracleConnectionStringBuilder(string connectionString, IUpgradeLog logger, out string adminConnectionString, out string schemaName)
+        {
+            if (string.IsNullOrEmpty(connectionString) || connectionString.Trim() == string.Empty)
+                throw new ArgumentNullException(nameof(connectionString));
+
+            if (logger == null)
+                throw new ArgumentNullException(nameof(logger));
+
+            var connectionStringBuilder = new OracleConnectionStringBuilder(connectionString);
+            schemaName = connectionStringBuilder.UserID;
+
+            if (string.IsNullOrEmpty(schemaName) || schemaName.Trim() == string.Empty)
+                throw new InvalidOperationException("The connection string does not specify a schema name.");
+
+            // Admin connection would generally have sysdba privileges or be connected to a common user in a multitenant environment.
+            connectionStringBuilder.UserID = "SYS";
+            connectionStringBuilder.Password = "your_admin_password"; // Needs to be a privileged user
+            connectionStringBuilder.ConnectionString += ";DBA Privilege=SYSDBA";
+            adminConnectionString = connectionStringBuilder.ConnectionString;
+        }
+    }
 }
