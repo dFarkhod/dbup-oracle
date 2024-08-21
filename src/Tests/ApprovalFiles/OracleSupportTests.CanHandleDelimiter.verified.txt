@@ -1,0 +1,41 @@
+﻿DB Operation: Open connection
+Info:         Beginning database upgrade
+Info:         Checking whether journal table exists..
+DB Operation: Execute scalar command: select 1 from user_tables where table_name = 'SCHEMAVERSIONS'
+DB Operation: Dispose command
+Info:         Fetching list of already executed scripts.
+DB Operation: Execute reader command: select scriptname from SCHEMAVERSIONS order by scriptname
+DB Operation: Dispose command
+Info:         Executing Database Server script 'Script0003'
+Info:         Checking whether journal table exists..
+DB Operation: Execute scalar command: select 1 from user_tables where table_name = 'SCHEMAVERSIONS'
+DB Operation: Dispose command
+DB Operation: Execute non query command: BEGIN
+    EXECUTE IMMEDIATE 'DROP PROCEDURE testSproc';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -4043 THEN
+            RAISE;
+        END IF;
+END;
+
+BEGIN
+    EXECUTE IMMEDIATE '
+        CREATE OR REPLACE PROCEDURE testSproc(
+            ssn IN VARCHAR2
+        ) IS
+        BEGIN
+            FOR rec IN (SELECT id FROM customer WHERE ssn = ssn) LOOP
+                -- Your logic here
+            END LOOP;
+        END;';
+END;
+DB Operation: Dispose command
+DB Operation: Create parameter
+Info:         DB Operation: Add parameter to command: scriptName=Script0003
+DB Operation: Create parameter
+Info:         DB Operation: Add parameter to command: applied=<date>
+DB Operation: Execute non query command: insert into SCHEMAVERSIONS (ScriptName, Applied) values (:scriptName,:applied)
+DB Operation: Dispose command
+Info:         Upgrade successful
+DB Operation: Dispose connection
